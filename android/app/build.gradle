@@ -120,8 +120,9 @@ dependencies {
     }
     
     implementation project(':react-native-vector-icons')
-
+    implementation  project(':react-native-audio-recorder-player')
 }
+
 project.ext.vectoricons = [
     iconFontNames: [ 'MaterialIcons.ttf', 'EvilIcons.ttf' ] // Name of the font files you want to copy
 ]

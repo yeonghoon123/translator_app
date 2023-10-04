@@ -1,8 +1,16 @@
-import React, {useEffect} from 'react';
-import {View, Text} from 'react-native';
+import React, {useEffect, useState} from 'react';
+import {View, Text, PermissionsAndroid} from 'react-native';
 import {Icon} from '@rneui/themed';
 
+import AudioRecorderPlayer from 'react-native-audio-recorder-player';
+
 const Home = ({navigation}) => {
+  const [recordSwitch, setRecordSwitch] = useState(false); // 녹음 진행 스위치
+  const [recorder, setRecorder] = useState(null); // 녹음 정보
+  const [recordPath, setRecordPath] = useState(null); // 녹음 정보 저장 경로
+
+  const audioRecorderPlayer = new AudioRecorderPlayer();
+
   const permissionCheck = async () => {
     if (Platform.OS === 'android') {
       try {
@@ -34,17 +42,49 @@ const Home = ({navigation}) => {
     }
   };
 
+  const onStartRecord = async () => {
+    console.log('teat');
+
+    const result = await audioRecorderPlayer.startRecorder();
+    audioRecorderPlayer.addRecordBackListener(e => {
+      setRecorder({
+        recordSecs: e.currentPosition,
+        recordTime: audioRecorderPlayer.mmssss(Math.floor(e.currentPosition)),
+      });
+      return;
+    });
+
+    console.log(result);
+    setRecordSwitch(true);
+  };
+
+  const onStopRecord = async () => {
+    const result = await audioRecorderPlayer.stopRecorder();
+    audioRecorderPlayer.removeRecordBackListener();
+    setRecorder(null);
+    console.log(result);
+    console.log(recorder);
+    setRecordSwitch(false);
+  };
+
   useEffect(() => {
     permissionCheck();
   }, []);
+
   return (
     <View style={{flex: 1, alignItems: 'center', justifyContent: 'center'}}>
-      <Text>Translator Text</Text>
-      <Icon
-        name="mic"
-        color="#517fa4"
-        onPress={() => navigation.navigate('Translator Text')}
-      />
+      {recordSwitch ? (
+        <View>
+          <Text>Record Text</Text>
+          <Icon name="mic" color="#517fa4" onPress={onStopRecord} />
+        </View>
+      ) : (
+        <View>
+          <Text>ty</Text>
+          <Text style={{marginBottom: '10px'}}>Translator speech</Text>
+          <Icon name="mic" color="#517fa4" onPress={() => onStartRecord()} />
+        </View>
+      )}
     </View>
   );
 };
