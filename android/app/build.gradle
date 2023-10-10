@@ -76,7 +76,7 @@ android {
     namespace "com.translator_app"
     defaultConfig {
         applicationId "com.translator_app"
-        minSdkVersion rootProject.ext.minSdkVersion
+        minSdkVersion 24
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
