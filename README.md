@@ -8,6 +8,12 @@
 
 ```
 - React Native
+- react-native-picker
+- react-navigation
+- rneui/base
+- react-native-audio-recorder-player
+- ffmpeg-kit-react-native
+- react-native-sound
 ```
 
 버전

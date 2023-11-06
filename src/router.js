@@ -1,8 +1,9 @@
 import React from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import Home from './component/Home';
-import Details from './component/Details';
+import {Button, Text} from 'react-native';
+import STTScreen from './component/STT';
+import TranslateScreen from './component/Translate';
 
 const Stack = createNativeStackNavigator();
 
@@ -10,8 +11,15 @@ const Router = () => {
   return (
     <NavigationContainer>
       <Stack.Navigator>
-        <Stack.Screen name="Speech To Text" component={Home} />
-        <Stack.Screen name="Translator Text" component={Details} />
+        <Stack.Screen
+          name="Speech To Text"
+          component={STTScreen}
+          options={({navigation, route}) => ({
+            // Add a placeholder button without the `onPress` to avoid flicker
+            headerRight: () => <Button title="TEXT TRANSLATE" />,
+          })}
+        />
+        <Stack.Screen name="Text Translator" component={TranslateScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
