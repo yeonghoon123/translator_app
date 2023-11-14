@@ -17,6 +17,7 @@ import {
   ScrollView,
   Button,
   Alert,
+  Modal,
 } from 'react-native'; // React Native 컴포넌트, API 기능 사용
 import convertWavToFlac from '../../compositions/ffmpeg'; // 데이터 변환 함수 사용
 import RNFS from 'react-native-fs'; // fs 라이브러리 사용
@@ -25,14 +26,19 @@ import {Picker} from '@react-native-picker/picker'; // picker 라이브러리 �
 import data from '../../compositions/testFile.json'; // 테스트 데이터 사용
 
 import AudioRecorderPlayer from 'react-native-audio-recorder-player'; // 음성 녹음 라이브러리 사용
+import {Icon} from '@rneui/base';
 const audioRecorderPlayer = new AudioRecorderPlayer(); // 녹음 플레이어 사용
 
-const STTScreen = ({navigation}) => {
+const STTScreen = ({navigation, route}) => {
+  const {dataFromPreviousScreen} = route?.params || {};
+
   const [selectedLanguage, setSelectedLanguage] = useState('ko-KR'); // 인식 언어 설정
   const [recordSwitch, setRecordSwitch] = useState(false); // 녹음 진행 스위치
   const [recorder, setRecorder] = useState(null); // 녹음 정보
   const [recordPath, setRecordPath] = useState(null); // 녹음 정보 저장 경로
   const [loadingSTT, setLoadingSTT] = useState(false); // STT 데이터 요청 확인 스위치
+  const [saveListSwitch, setSaveListSwitch] = useState(false); // 저장된 번역 목록 모달 스위치
+  const [saveItemList, setSaveItemList] = useState([]); // 저장된 번역 목록
 
   // Speach 번역한 Text데이터
   const [STTResult, setSTTResult] = useState({
@@ -72,6 +78,31 @@ const STTScreen = ({navigation}) => {
         return;
       }
     }
+  };
+
+  // 저장된 번역 목록 가져오기
+  const getSaveItems = async () => {
+    // 서버로 요청
+    const response = await fetch(`${process.env.LAMBDA_API}/get-saveitem`, {
+      method: 'GET',
+    });
+
+    const result = await response.json(); // 서버에서 보낸 데이터
+    setSaveItemList(result.Data);
+  };
+
+  // 저장된 번역 데이터 삭제
+  const deleteSaveItem = async itemId => {
+    const response = await fetch(`${process.env.LAMBDA_API}/delete-item`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({Id: itemId}),
+    });
+
+    const result = await response.json();
+    result && getSaveItems();
   };
 
   // Google STT Rest API로 데이터 전송
@@ -120,12 +151,13 @@ const STTScreen = ({navigation}) => {
       // STT변환 확인 여부 검사
       if (fetchResult.results) {
         // 여러줄 인식할경우 배열로 만들어 준 다음 줄바꿈으로 합쳐서 문자열 생성
-        const sttTextArr =
+        let sttTextArr =
           fetchResult.results &&
           fetchResult.results
             .map((v, _) => v.alternatives[0].transcript)
             .join('')
-            .replaceAll('.', '.\n');
+            .replaceAll('.', '.\n')
+            .replace(/\n+$/, '');
 
         setSTTResult({sttText: sttTextArr, transformChk: true});
       } else {
@@ -190,6 +222,7 @@ const STTScreen = ({navigation}) => {
   const nextScreenCheck = () => {
     if (STTResult.transformChk) {
       navigation.navigate('Text Translator', {
+        newTranslator: true,
         sttText: STTResult.sttText,
         languageCode: selectedLanguage,
       });
@@ -201,6 +234,7 @@ const STTScreen = ({navigation}) => {
   // 첫 렌더시 권한 확인
   useEffect(() => {
     permissionCheck();
+    getSaveItems();
   }, []);
 
   // 번역 페이지로 이동하기전 변환 확인
@@ -211,6 +245,27 @@ const STTScreen = ({navigation}) => {
       ),
     });
   }, [navigation, STTResult]);
+
+  // 이화면이 보여질 경우 실행될 useEffect
+  useEffect(() => {
+    console.log('Data from previous screen:', dataFromPreviousScreen);
+
+    // 이 페이지가 focus될 때마다 실행되는 코드
+    const unsubscribe = navigation.addListener('focus', () => {
+      // 여기에서 전 페이지에서 받은 데이터 초기화
+      setSelectedLanguage('ko-KR');
+      setRecordSwitch(false);
+      setRecorder(null);
+      setRecordPath(null);
+      setLoadingSTT(false);
+      setSaveListSwitch(false);
+      setSaveItemList([]);
+      getSaveItems();
+    });
+
+    // 컴포넌트가 언마운트될 때 리스너 해제
+    return unsubscribe;
+  }, [dataFromPreviousScreen]);
 
   return (
     <View style={styles.container}>
@@ -228,14 +283,22 @@ const STTScreen = ({navigation}) => {
           </Picker>
         </View>
       )}
-      <TouchableOpacity
-        style={styles.recordButton}
-        disabled={loadingSTT}
-        onPress={recordSwitch ? onStopRecord : onStartRecord}>
-        <Text style={styles.recordButtonText}>
-          {recordSwitch ? '녹음 중지' : '녹음 시작'}
-        </Text>
-      </TouchableOpacity>
+      <View style={{flexDirection: 'row'}}>
+        <TouchableOpacity
+          style={styles.recordButton}
+          disabled={loadingSTT}
+          onPress={recordSwitch ? onStopRecord : onStartRecord}>
+          <Text style={styles.recordButtonText}>
+            {recordSwitch ? '녹음 중지' : '녹음 시작'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.saveListButton}
+          disabled={loadingSTT}
+          onPress={() => setSaveListSwitch(true)}>
+          <Text style={styles.saveListButtonText}>번역 저장 목록</Text>
+        </TouchableOpacity>
+      </View>
       {!recordSwitch && recordPath && (
         <>
           <View style={styles.sttResult}>
@@ -250,6 +313,57 @@ const STTScreen = ({navigation}) => {
           </View>
         </>
       )}
+      <Modal
+        animationType="slide"
+        // transparent={true}
+        visible={saveListSwitch}
+        onRequestClose={() => setSaveListSwitch(false)}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>저장된 목록</Text>
+            <ScrollView>
+              {saveItemList ? (
+                saveItemList.map((item, index) => {
+                  return (
+                    <View style={styles.listItem} key={`saveList_${index}`}>
+                      <View>
+                        <Text>{item.Stt_text}</Text>
+                      </View>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          marginLeft: 'auto',
+                        }}>
+                        <Icon
+                          name="delete"
+                          onPress={() => deleteSaveItem(item.Id)}></Icon>
+                        <Icon
+                          style={{marginLeft: '10'}}
+                          name="play-arrow"
+                          onPress={() =>
+                            navigation.navigate('Text Translator', {
+                              newTranslator: false,
+                              saveDatas: item,
+                            })
+                          }></Icon>
+                      </View>
+                    </View>
+                  );
+                })
+              ) : (
+                <View>
+                  <Text>Not Item</Text>
+                </View>
+              )}
+            </ScrollView>
+            <TouchableOpacity
+              onPress={() => setSaveListSwitch(false)}
+              style={styles.closeButton}>
+              <Text style={styles.closeButtonText}>닫기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -262,19 +376,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#fff',
   },
+
   header: {
     fontSize: 24,
     marginBottom: 20,
   },
+
   recordButton: {
     backgroundColor: 'blue',
     padding: 10,
     borderRadius: 5,
+    marginRight: 10,
     marginBottom: 10,
   },
+
   recordButtonText: {
     color: 'white',
   },
+
+  saveListButton: {
+    backgroundColor: 'skyblue',
+    padding: 10,
+    borderRadius: 5,
+    marginBottom: 10,
+  },
+
+  saveListButtonText: {
+    color: 'white',
+  },
+
   transformButton: {
     backgroundColor: 'green',
     width: 100,
@@ -283,9 +413,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+
   transformButtonText: {
     color: 'white',
   },
+
   picker: {
     height: 50,
     width: 150,
@@ -294,24 +426,68 @@ const styles = StyleSheet.create({
     borderColor: 'black',
     borderRadius: 4,
   },
+
   audioInfo: {
     marginTop: 20,
     fontSize: 16,
   },
+
   sttResult: {
     margin: 30,
     display: 'flex',
     flexDirection: 'column',
     alignSelf: 'stretch',
   },
+
   sttResultheader: {
     fontSize: 14,
     marginBottom: 10,
   },
+
   sttResultText: {
     fontSize: 14,
     borderWidth: 1,
     padding: 5,
+  },
+
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 10,
+    width: '80%',
+    maxHeight: '80%',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  listItem: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: 16,
+    marginBottom: 5,
+    padding: 10,
+    borderWidth: 1,
+  },
+  closeButton: {
+    marginTop: 20,
+    padding: 10,
+    backgroundColor: 'blue',
+    borderRadius: 5,
+    alignSelf: 'flex-end',
+  },
+  closeButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
 

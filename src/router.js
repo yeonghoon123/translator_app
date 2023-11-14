@@ -16,10 +16,22 @@ const Router = () => {
           component={STTScreen}
           options={({navigation, route}) => ({
             // Add a placeholder button without the `onPress` to avoid flicker
-            headerRight: () => <Button title="TEXT TRANSLATE" />,
+            headerRight: () => <Button title="번역" />,
           })}
         />
-        <Stack.Screen name="Text Translator" component={TranslateScreen} />
+        <Stack.Screen
+          name="Text Translator"
+          component={TranslateScreen}
+          options={({navigation, route}) => ({
+            // Add a placeholder button without the `onPress` to avoid flicker
+            headerRight: () => (
+              <Button
+                title="홈으로"
+                onPress={() => navigation.navigate('Speech To Text')}
+              />
+            ),
+          })}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

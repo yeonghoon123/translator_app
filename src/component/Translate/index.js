@@ -6,17 +6,20 @@
 버전: 0.5
 */
 
-import React, {useEffect, useState} from 'react'; // React 기능 사용
-import {View, Text, StyleSheet, ScrollView} from 'react-native'; // React Native 기능 사용
+import React, {useEffect, useState, useCallback} from 'react'; // React 기능 사용
+import {View, Text, StyleSheet, ScrollView, Alert, Button} from 'react-native'; // React Native 기능 사용
 import {ListItem, Icon} from '@rneui/themed'; // React Native Style 라이브러리 사용
 import uuid from 'react-native-uuid'; // uuid 라이브러리 사용
 import Sound from 'react-native-sound'; // 음성 재생 라이브러리 사용
 import RNFS from 'react-native-fs'; // fs 기능 사용
 
 const TranslateScreen = ({route, navigation}) => {
-  const {sttText, languageCode} = route.params; // 음성 인식 데이터
+  const {sttText, languageCode, newTranslator, saveDatas} = route.params; // 음성 인식 데이터
+
+  const [loading, setLoading] = useState(true);
   const [translateData, setTranslateData] = useState([]); // 번역한 데이터
   const [speechData, setSpeechData] = useState(null); // 음성 재생 정보
+  const [saveData, setSaveData] = useState({});
 
   // TTS에서 사용되는 language code
   const getLanguageCode = language => {
@@ -28,6 +31,14 @@ const TranslateScreen = ({route, navigation}) => {
       case 'ja':
         return 'ja-JP';
     }
+  };
+
+  // TTS 파일 데이터 생성
+  const createTtsFile = async audioContent => {
+    const FILE_PATH = `${RNFS.CachesDirectoryPath}/${uuid.v4()}.mp3`; // 음성 재생을 위한 임시 파일 경로
+    await RNFS.writeFile(FILE_PATH, audioContent, 'base64'); // 파일의 데이터 삽입
+
+    return FILE_PATH;
   };
 
   // 번역 가능한 언어 목록 가져오기
@@ -98,8 +109,19 @@ const TranslateScreen = ({route, navigation}) => {
 
         const ttsResult = await ttsResponse.json(); // TTS 데이터 결과
 
-        const FILE_PATH = `${RNFS.CachesDirectoryPath}/${uuid.v4()}.mp3`; // 음성 재생을 위한 임시 파일 경로
-        await RNFS.writeFile(FILE_PATH, ttsResult.audioContent, 'base64'); // 파일의 데이터 삽입
+        const FILE_PATH = await createTtsFile(ttsResult.audioContent);
+
+        // dynamo db에 저장될 데이터 저장
+        setSaveData(c => {
+          const changeData = {
+            ...c,
+            languageName: {...c.languageName, [v.language]: v.name},
+            ttsBase64: {...c.ttsBase64, [v.language]: ttsResult.audioContent},
+            translatorText: {...c.translatorText, [v.language]: combineText},
+          };
+
+          return changeData;
+        });
 
         // 텍스트 번역 데이터 저장
         setTranslateData(c => [
@@ -114,6 +136,25 @@ const TranslateScreen = ({route, navigation}) => {
       console.log('TR100-L10. Success');
     } catch (err) {
       console.log(`TR100-E10. ${err}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 저장된 번역 데이터 가져오기
+  const getSaveData = async () => {
+    for (var key of Object.keys(saveDatas.Translator_text)) {
+      const FILE_PATH = await createTtsFile(saveDatas.Tts_base64[key]);
+
+      // 텍스트 번역 데이터 저장
+      setTranslateData(c => [
+        ...c,
+        {
+          language: saveDatas.Language_name[key],
+          textData: saveDatas.Translator_text[key],
+          ttsFilePath: FILE_PATH,
+        },
+      ]);
     }
   };
 
@@ -147,39 +188,98 @@ const TranslateScreen = ({route, navigation}) => {
     }
   };
 
+  // 서버로 데이터를 전송
+  const saveTranslateData = async () => {
+    const response = await fetch(`${process.env.LAMBDA_API}/create-item`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(saveData),
+    });
+
+    const result = await response.json();
+
+    if (result.Status) {
+      Alert.alert('안내', '저장 완료 했습니다.', [{text: '저장'}]);
+    } else {
+      Alert.alert('안내', result.Message, [{text: '확인'}]);
+    }
+  };
+
+  // 번역 저장 확인 여부
+  const saveBtnEvent = () => {
+    Alert.alert('안내', '번역 정보를 저장 하시겠습니까?', [
+      {
+        text: '취소',
+        style: '취소',
+      },
+      {text: '저장', onPress: () => saveTranslateData()},
+    ]);
+  };
+
+  // 번역 페이지로 이동하기전 변환 확인
   useEffect(() => {
-    getAvailableLang();
+    if (newTranslator) {
+      navigation.setOptions({
+        headerRight: () => (
+          <Button onPress={() => saveBtnEvent()} title="save" />
+        ),
+      });
+    }
+  }, [saveData]);
+
+  // 페이지 렌더시 저장된 번역을 가져왔는지 확인 여부
+  useEffect(() => {
+    setLoading(true);
+
+    if (newTranslator) {
+      getAvailableLang();
+      setSaveData({
+        sttText: sttText,
+        languageCode: languageCode,
+        id: uuid.v4(),
+        ttsBase64: {},
+        translatorText: {},
+      });
+    } else {
+      getSaveData();
+    }
+
+    setLoading(false);
   }, []);
 
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Translate Text</Text>
-      <ScrollView style={{alignSelf: 'stretch'}}>
-        {translateData.map((value1, i) => {
-          return (
-            <ListItem style={{marginVertical: 15}} key={`language_${i}`}>
-              <ListItem.Content>
-                <ListItem.Title style={{marginBottom: 15}}>
-                  {value1.language}
-                  <Icon
-                    name="mic"
-                    onPress={() => speechTextControl(value1.ttsFilePath)}
-                  />
-                </ListItem.Title>
-                <ListItem.Subtitle
-                  style={{
-                    borderWidth: 1,
-                    padding: 5,
-                    alignSelf: 'stretch',
-                    fontSize: 14,
-                  }}>
-                  {value1.textData}
-                </ListItem.Subtitle>
-              </ListItem.Content>
-            </ListItem>
-          );
-        })}
-      </ScrollView>
+      {!loading && (
+        <ScrollView style={{alignSelf: 'stretch'}}>
+          {translateData.map((value1, i) => {
+            return (
+              <ListItem style={{marginVertical: 15}} key={`language_${i}`}>
+                <ListItem.Content>
+                  <ListItem.Title style={{marginBottom: 15}}>
+                    {value1.language}
+                    <Icon
+                      name="mic"
+                      onPress={() => speechTextControl(value1.ttsFilePath)}
+                    />
+                  </ListItem.Title>
+                  <ListItem.Subtitle
+                    style={{
+                      borderWidth: 1,
+                      padding: 5,
+                      alignSelf: 'stretch',
+                      fontSize: 14,
+                    }}>
+                    {value1.textData}
+                  </ListItem.Subtitle>
+                </ListItem.Content>
+              </ListItem>
+            );
+          })}
+        </ScrollView>
+      )}
     </View>
   );
 };
