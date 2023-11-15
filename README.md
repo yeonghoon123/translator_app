@@ -24,7 +24,7 @@ env 파일 생성 후 env 설정
     GOOGLE_TRANSLATE_AVAILABLE_API=https://translation.googleapis.com/language/translate/v2/languages?key={google cloud key}
     GOOGLE_TRANSLATE_API=https://translation.googleapis.com/language/translate/v2?key={google cloud key}
     GOOGLE_TTS_API=https://texttospeech.googleapis.com/v1/text:synthesize?key={google cloud key}
-    LAMBDA_API={APIGateway url}
+    LAMBDA_API={API Gateway url}
 
 ## Running the tests
 
