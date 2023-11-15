@@ -6,6 +6,10 @@
 
 ### Installing
 
+Node, JDK 설치
+
+설치 가이드 링크: https://reactnative.dev/docs/environment-setup
+
 git clone하여 프로젝트 설치
 
     git clone https://github.com/yeonghoon123/translator_app.git
