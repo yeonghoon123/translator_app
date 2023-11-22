@@ -3,7 +3,7 @@
 작성자: 김영훈
 작성일: 2023.10.10
 설명: 사용자의 음성녹음 파일을 Text로 변환하는 화면 구현
-버전: 0.5
+버전: 0.9
 */
 
 import React, {useEffect, useState} from 'react'; // React 기능 사용
@@ -46,7 +46,7 @@ const STTScreen = ({navigation, route}) => {
     transformChk: false,
   });
 
-  // 사용자 기기의 파일 읽기/쓰기, 마이크 사용 권한 확인
+  // ST100-F10 사용자 기기의 파일 읽기/쓰기, 마이크 사용 권한 확인
   const permissionCheck = async () => {
     if (Platform.OS === 'android') {
       try {
@@ -80,7 +80,7 @@ const STTScreen = ({navigation, route}) => {
     }
   };
 
-  // 저장된 번역 목록 가져오기
+  // ST100-F20 저장된 번역 목록 가져오기
   const getSaveItems = async () => {
     // 서버로 요청
     const response = await fetch(`${process.env.LAMBDA_API}/get-saveitem`, {
@@ -91,7 +91,7 @@ const STTScreen = ({navigation, route}) => {
     setSaveItemList(result.Data);
   };
 
-  // 저장된 번역 데이터 삭제
+  // ST100-F30 저장된 번역 데이터 삭제
   const deleteSaveItem = async itemId => {
     const response = await fetch(`${process.env.LAMBDA_API}/delete-item`, {
       method: 'DELETE',
@@ -105,7 +105,7 @@ const STTScreen = ({navigation, route}) => {
     result && getSaveItems();
   };
 
-  // Google STT Rest API로 데이터 전송
+  // ST100-F40 Google STT Rest API로 데이터 전송
   const fetchSTT = async recordPath => {
     try {
       setLoadingSTT(true);
@@ -170,9 +170,9 @@ const STTScreen = ({navigation, route}) => {
     }
   };
 
-  // 녹음 시작 기능
+  // ST100-F50 녹음 시작 기능
   const onStartRecord = async () => {
-    console.log('ST100-L20. record start');
+    console.log('ST100-L50. record start');
     const RECORD_PATH = `${RNFS.CachesDirectoryPath}/${uuid.v4()}.wav`; // 녹음 파일 경로
 
     await audioRecorderPlayer.startRecorder(RECORD_PATH); // 녹음 시작 이벤트 실행
@@ -196,14 +196,14 @@ const STTScreen = ({navigation, route}) => {
     setRecordSwitch(true); // 녹음 시작 스위치
   };
 
-  // 녹음 중지 기능
+  // ST100-F60 녹음 중지 기능
   const onStopRecord = async () => {
-    console.log('ST100-L30. record stop');
+    console.log('ST100-L60. record stop');
 
     const result = await audioRecorderPlayer.stopRecorder(); // 녹음 정지
     audioRecorderPlayer.removeRecordBackListener(); // 녹음 정지 이벤트 실행
 
-    console.log('ST100-L31. record result' + result);
+    console.log('ST100-L61. record result' + result);
 
     setRecorder({
       recordSecs: 0,
@@ -218,7 +218,7 @@ const STTScreen = ({navigation, route}) => {
     fetchSTT(changeFileType);
   };
 
-  // 음성인식 완료후 번역 페이지로 이동하기 전 검사
+  // ST100-F70 음성인식 완료후 번역 페이지로 이동하기 전 검사
   const nextScreenCheck = () => {
     if (STTResult.transformChk) {
       navigation.navigate('Text Translator', {
@@ -248,8 +248,6 @@ const STTScreen = ({navigation, route}) => {
 
   // 이화면이 보여질 경우 실행될 useEffect
   useEffect(() => {
-    console.log('Data from previous screen:', dataFromPreviousScreen);
-
     // 이 페이지가 focus될 때마다 실행되는 코드
     const unsubscribe = navigation.addListener('focus', () => {
       // 여기에서 전 페이지에서 받은 데이터 초기화
@@ -292,12 +290,14 @@ const STTScreen = ({navigation, route}) => {
             {recordSwitch ? '녹음 중지' : '녹음 시작'}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.saveListButton}
-          disabled={loadingSTT}
-          onPress={() => setSaveListSwitch(true)}>
-          <Text style={styles.saveListButtonText}>번역 저장 목록</Text>
-        </TouchableOpacity>
+        {!recordSwitch && (
+          <TouchableOpacity
+            style={styles.saveListButton}
+            disabled={loadingSTT}
+            onPress={() => setSaveListSwitch(true)}>
+            <Text style={styles.saveListButtonText}>번역 저장 목록</Text>
+          </TouchableOpacity>
+        )}
       </View>
       {!recordSwitch && recordPath && (
         <>
@@ -327,7 +327,12 @@ const STTScreen = ({navigation, route}) => {
                   return (
                     <View style={styles.listItem} key={`saveList_${index}`}>
                       <View>
-                        <Text>{item.Stt_text}</Text>
+                        <Text
+                          style={{maxWidth: 200}}
+                          numberOfLines={1}
+                          ellipsizeMode="tail">
+                          {item.Stt_text}
+                        </Text>
                       </View>
                       <View
                         style={{
@@ -343,7 +348,8 @@ const STTScreen = ({navigation, route}) => {
                           onPress={() =>
                             navigation.navigate('Text Translator', {
                               newTranslator: false,
-                              saveDatas: item,
+                              sttText: item.Stt_text,
+                              languageCode: item.Language_code,
                             })
                           }></Icon>
                       </View>

@@ -3,7 +3,7 @@
 작성자: 김영훈
 작성일: 2023.10.17
 설명: ffmpeg 라이브러리를 사용하여 .wav파일을 .flac파일로 변환
-버전: 0.5
+버전: 0.9
 */
 
 import {FFmpegKit, FFmpegKitConfig} from 'ffmpeg-kit-react-native';

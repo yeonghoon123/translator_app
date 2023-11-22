@@ -47,11 +47,14 @@ React Native
 etc
 
 react-native-picker
-react-navigation
+react-navigation/native
 rneui/base
 react-native-audio-recorder-player
 ffmpeg-kit-react-native
 react-native-sound
+react-native-fs
+react-native-uuid
+react-native-vector-icons
 ```
 
 ## Versioning

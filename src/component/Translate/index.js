@@ -3,7 +3,7 @@
 작성자: 김영훈
 작성일: 2023.10.10
 설명: 변환한 텍스트를 원하는 언어로 번역
-버전: 0.5
+버전: 0.9
 */
 
 import React, {useEffect, useState, useCallback} from 'react'; // React 기능 사용
@@ -14,14 +14,14 @@ import Sound from 'react-native-sound'; // 음성 재생 라이브러리 사용
 import RNFS from 'react-native-fs'; // fs 기능 사용
 
 const TranslateScreen = ({route, navigation}) => {
-  const {sttText, languageCode, newTranslator, saveDatas} = route.params; // 음성 인식 데이터
+  const {sttText, languageCode, newTranslator} = route.params; // 음성 인식 데이터
 
   const [loading, setLoading] = useState(true);
   const [translateData, setTranslateData] = useState([]); // 번역한 데이터
   const [speechData, setSpeechData] = useState(null); // 음성 재생 정보
   const [saveData, setSaveData] = useState({});
 
-  // TTS에서 사용되는 language code
+  // TR100-F10 TTS에서 사용되는 language code
   const getLanguageCode = language => {
     switch (language) {
       case 'ko':
@@ -33,7 +33,7 @@ const TranslateScreen = ({route, navigation}) => {
     }
   };
 
-  // TTS 파일 데이터 생성
+  // TR100-F20 TTS 파일 데이터 생성
   const createTtsFile = async audioContent => {
     const FILE_PATH = `${RNFS.CachesDirectoryPath}/${uuid.v4()}.mp3`; // 음성 재생을 위한 임시 파일 경로
     await RNFS.writeFile(FILE_PATH, audioContent, 'base64'); // 파일의 데이터 삽입
@@ -41,7 +41,7 @@ const TranslateScreen = ({route, navigation}) => {
     return FILE_PATH;
   };
 
-  // 번역 가능한 언어 목록 가져오기
+  // TR100-F30 번역 가능한 언어 목록 가져오기
   const getAvailableLang = async () => {
     try {
       const translateLanguage = ['한국어', '영어', '일본어']; // 번역 언어 목록
@@ -111,18 +111,6 @@ const TranslateScreen = ({route, navigation}) => {
 
         const FILE_PATH = await createTtsFile(ttsResult.audioContent);
 
-        // dynamo db에 저장될 데이터 저장
-        setSaveData(c => {
-          const changeData = {
-            ...c,
-            languageName: {...c.languageName, [v.language]: v.name},
-            ttsBase64: {...c.ttsBase64, [v.language]: ttsResult.audioContent},
-            translatorText: {...c.translatorText, [v.language]: combineText},
-          };
-
-          return changeData;
-        });
-
         // 텍스트 번역 데이터 저장
         setTranslateData(c => [
           ...c,
@@ -133,32 +121,15 @@ const TranslateScreen = ({route, navigation}) => {
           },
         ]);
       });
-      console.log('TR100-L10. Success');
+      console.log('TR100-L30. Success');
     } catch (err) {
-      console.log(`TR100-E10. ${err}`);
+      console.log(`TR100-E30. ${err}`);
     } finally {
       setLoading(false);
     }
   };
 
-  // 저장된 번역 데이터 가져오기
-  const getSaveData = async () => {
-    for (var key of Object.keys(saveDatas.Translator_text)) {
-      const FILE_PATH = await createTtsFile(saveDatas.Tts_base64[key]);
-
-      // 텍스트 번역 데이터 저장
-      setTranslateData(c => [
-        ...c,
-        {
-          language: saveDatas.Language_name[key],
-          textData: saveDatas.Translator_text[key],
-          ttsFilePath: FILE_PATH,
-        },
-      ]);
-    }
-  };
-
-  // 음성 재생 및 정지
+  // TR100-F40 음성 재생 및 정지
   const speechTextControl = ttsFilePath => {
     try {
       // 음성 재생을 한번이라도 한경우 정지, 만약 경로와 요청한 음성 데이터 경로가 같을경우 초기화
@@ -173,22 +144,22 @@ const TranslateScreen = ({route, navigation}) => {
       // 음성 재생 정보 생성 및 재생
       const sound = new Sound(ttsFilePath, '', error => {
         if (error) {
-          console.log(`TR100-E20. Error in playing sound: ${error}`);
+          console.log(`TR100-E40. Error in playing sound: ${error}`);
         } else {
           setSpeechData(sound);
           sound.play(success => {
             if (!success) {
-              console.log('TR100-L20. Sound did not play');
+              console.log('TR100-L40. Sound did not play');
             }
           });
         }
       });
     } catch (err) {
-      console.log(`TR100-E21 . ${err}`);
+      console.log(`TR100-E41 . ${err}`);
     }
   };
 
-  // 서버로 데이터를 전송
+  // TR100-F50 서버로 데이터를 전송
   const saveTranslateData = async () => {
     const response = await fetch(`${process.env.LAMBDA_API}/create-item`, {
       method: 'POST',
@@ -201,13 +172,13 @@ const TranslateScreen = ({route, navigation}) => {
     const result = await response.json();
 
     if (result.Status) {
-      Alert.alert('안내', '저장 완료 했습니다.', [{text: '저장'}]);
+      Alert.alert('안내', '저장 완료 했습니다.', [{text: '확인'}]);
     } else {
       Alert.alert('안내', result.Message, [{text: '확인'}]);
     }
   };
 
-  // 번역 저장 확인 여부
+  // TR100-F60 번역 저장 확인 여부
   const saveBtnEvent = () => {
     Alert.alert('안내', '번역 정보를 저장 하시겠습니까?', [
       {
@@ -234,17 +205,14 @@ const TranslateScreen = ({route, navigation}) => {
     setLoading(true);
 
     if (newTranslator) {
-      getAvailableLang();
       setSaveData({
         sttText: sttText,
         languageCode: languageCode,
         id: uuid.v4(),
-        ttsBase64: {},
-        translatorText: {},
       });
-    } else {
-      getSaveData();
     }
+
+    getAvailableLang();
 
     setLoading(false);
   }, []);
