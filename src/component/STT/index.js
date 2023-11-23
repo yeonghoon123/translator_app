@@ -35,6 +35,7 @@ const STTScreen = ({navigation, route}) => {
   const [selectedLanguage, setSelectedLanguage] = useState('ko-KR'); // 인식 언어 설정
   const [recordSwitch, setRecordSwitch] = useState(false); // 녹음 진행 스위치
   const [recorder, setRecorder] = useState(null); // 녹음 정보
+  const [countTime, setCountTime] = useState(); // 사용자가 녹음시 60초 제한 타이머
   const [recordPath, setRecordPath] = useState(null); // 녹음 정보 저장 경로
   const [loadingSTT, setLoadingSTT] = useState(false); // STT 데이터 요청 확인 스위치
   const [saveListSwitch, setSaveListSwitch] = useState(false); // 저장된 번역 목록 모달 스위치
@@ -193,6 +194,7 @@ const STTScreen = ({navigation, route}) => {
       transformChk: false,
     });
 
+    setCountTime(60); // 사용자가 녹음시 제한 시간 초기화
     setRecordSwitch(true); // 녹음 시작 스위치
   };
 
@@ -265,6 +267,26 @@ const STTScreen = ({navigation, route}) => {
     return unsubscribe;
   }, [dataFromPreviousScreen]);
 
+  // 사용자가 녹음시 제한 시간 차감
+  useEffect(() => {
+    if (recordSwitch) {
+      const timer = setInterval(() => {
+        setCountTime(c => {
+          if (c === 1) {
+            onStopRecord();
+            return 0;
+          }
+
+          return (c = c - 1);
+        });
+      }, 1000);
+
+      return () => {
+        clearInterval(timer);
+      };
+    }
+  }, [recordSwitch]);
+
   return (
     <View style={styles.container}>
       <Text style={styles.header}>음성 녹음 화면</Text>
@@ -299,6 +321,7 @@ const STTScreen = ({navigation, route}) => {
           </TouchableOpacity>
         )}
       </View>
+      {recordSwitch && <Text>{countTime}s</Text>}
       {!recordSwitch && recordPath && (
         <>
           <View style={styles.sttResult}>
